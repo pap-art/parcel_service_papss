@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ParcelService.Enums;
+using ParcelService.Exceptions;
 using ParcelService.Models;
 using Xunit;
 
@@ -8,7 +9,6 @@ namespace ParcelService.Tests
 {
     public class ParcelServiceTests
     {
-        
 
         private ParcelServiceImpl CreateService()
         {
@@ -16,27 +16,23 @@ namespace ParcelService.Tests
             var service = new ParcelServiceImpl
             {
                 CompanyName = "Test Parcel Service",
-                ParcelLockers = new[]
-                {
-                    CreateTestLocker(1, 100, new[]
-                    {
-                        (1, ParcelShelfType.Small),
-                        (2, ParcelShelfType.Medium),
-                        (3, ParcelShelfType.Large)
-                    }),
-                    CreateTestLocker(2, 200, new[]
-                    {
-                        (4, ParcelShelfType.Small),
-                        (5, ParcelShelfType.Medium),
-                        (6, ParcelShelfType.Large)
-                    }),
-                    CreateTestLocker(3, 300, new[]
-                    {
-                        (7, ParcelShelfType.Small),
-                        (8, ParcelShelfType.Medium),
-                        (9, ParcelShelfType.Large)
-                    })
-                }
+                ParcelLockers = new[] {
+            CreateTestLocker(1, 100, new [] {
+                (1, ParcelShelfType.Small),
+                (2, ParcelShelfType.Medium),
+                (3, ParcelShelfType.Large)
+              }),
+              CreateTestLocker(2, 200, new [] {
+                (4, ParcelShelfType.Small),
+                (5, ParcelShelfType.Medium),
+                (6, ParcelShelfType.Large)
+              }),
+              CreateTestLocker(3, 300, new [] {
+                (7, ParcelShelfType.Small),
+                (8, ParcelShelfType.Medium),
+                (9, ParcelShelfType.Large)
+              })
+          }
             };
 
             return service;
@@ -92,7 +88,6 @@ namespace ParcelService.Tests
             };
         }
 
-
         [Fact]
         public void ClientSend_WhenSmallParcelSent_ThenDeliveryCreated()
         {
@@ -108,7 +103,6 @@ namespace ParcelService.Tests
             Assert.NotEmpty(result.SecurityCode);
             Assert.True(result.Price > 0);
         }
-
 
         [Fact]
         public void GenerateSecurityCode_WhenCalled_ThenReturnsValidCode()
@@ -182,7 +176,6 @@ namespace ParcelService.Tests
             Assert.Equal(1.3m * standardPrice, priorityPrice);
         }
 
-
         [Fact]
         public void ClientSend_WhenSmallParcelFitsOnEmptySmallShelfAndSecondParcelIsSent_ThenFirstParcelTakesAllSmallShelfAndSecondOverflowsToMediumShelf()
         {
@@ -212,7 +205,7 @@ namespace ParcelService.Tests
             // Assert
             Assert.True(firstResult.DeliveryId > 0);
             Assert.NotEmpty(firstResult.SecurityCode);
-            Assert.Equal(15m, firstResult.Price);  
+            Assert.Equal(15m, firstResult.Price);
             Assert.True(secondResult.DeliveryId > 0);
             Assert.NotEmpty(secondResult.SecurityCode);
             //takes space in medium shelf, hence twice the price
@@ -222,9 +215,9 @@ namespace ParcelService.Tests
         [Fact]
         public void ClientSend_WhenAllShelvesAreFull_ThenThrowsArgumentNullException()
         {
-        // Arrange
+            // Arrange
             var service = CreateService();
-            
+
             var smallFillingparcel = new Parcel
             {
                 Width = ShelfSpace.SMALL_SHELF_WIDTH,
@@ -324,22 +317,18 @@ namespace ParcelService.Tests
             var service = new ParcelServiceImpl
             {
                 CompanyName = "3 Medium Shelves Co",
-                ParcelLockers = new[]
-                {
-                    CreateTestLocker(1, 100, new[]
-                    {
+                ParcelLockers = new[] {
+                    CreateTestLocker(1, 100, new [] {
                         (1, ParcelShelfType.Large),
                         (2, ParcelShelfType.Large),
                         (3, ParcelShelfType.Large)
                     }),
-                    CreateTestLocker(2, 200, new[]
-                    {
+                    CreateTestLocker(2, 200, new [] {
                         (4, ParcelShelfType.Large),
                         (5, ParcelShelfType.Large),
                         (6, ParcelShelfType.Large)
                     }),
-                    CreateTestLocker(3, 300, new[]
-                    {
+                    CreateTestLocker(3, 300, new [] {
                         (7, ParcelShelfType.Large),
                         (8, ParcelShelfType.Large),
                         (9, ParcelShelfType.Large)
@@ -355,7 +344,7 @@ namespace ParcelService.Tests
                 Depth = 100,
                 IsFragile = false,
                 IsPriority = false
-            }; 
+            };
             var parcel2 = new Parcel
             {
                 Width = 300,
@@ -363,7 +352,7 @@ namespace ParcelService.Tests
                 Depth = 100,
                 IsFragile = false,
                 IsPriority = false
-            }; 
+            };
             var parcel3 = new Parcel
             {
                 Width = 300,
@@ -392,30 +381,26 @@ namespace ParcelService.Tests
             var service = new ParcelServiceImpl
             {
                 CompanyName = "3 Medium Shelves Co",
-                ParcelLockers = new[]
-                {
-                    CreateTestLocker(1, 100, new[]
-                    {
-                        (1, ParcelShelfType.Large),
-                        (2, ParcelShelfType.Large),
-                        (3, ParcelShelfType.Large),
-                        (4, ParcelShelfType.Large)
-                    }),
-                    CreateTestLocker(2, 200, new[]
-                    {
-                        (5, ParcelShelfType.Large),
-                        (6, ParcelShelfType.Large),
-                        (7, ParcelShelfType.Large),
-                        (8, ParcelShelfType.Large)
-                    }),
-                    CreateTestLocker(3, 300, new[]
-                    {
-                        (9, ParcelShelfType.Large),
-                        (10, ParcelShelfType.Large),
-                        (11, ParcelShelfType.Large),
-                        (12, ParcelShelfType.Large)
-                    })
-                }
+                ParcelLockers = new[] {
+                CreateTestLocker(1, 100, new [] {
+                    (1, ParcelShelfType.Large),
+                    (2, ParcelShelfType.Large),
+                    (3, ParcelShelfType.Large),
+                    (4, ParcelShelfType.Large)
+                }),
+                CreateTestLocker(2, 200, new [] {
+                    (5, ParcelShelfType.Large),
+                    (6, ParcelShelfType.Large),
+                    (7, ParcelShelfType.Large),
+                    (8, ParcelShelfType.Large)
+                }),
+                CreateTestLocker(3, 300, new [] {
+                    (9, ParcelShelfType.Large),
+                    (10, ParcelShelfType.Large),
+                    (11, ParcelShelfType.Large),
+                    (12, ParcelShelfType.Large)
+                })
+              }
             };
 
             // Create parcels that collectively exceed vehicle capacity (800x200x200)
@@ -426,7 +411,7 @@ namespace ParcelService.Tests
                 Depth = 100,
                 IsFragile = false,
                 IsPriority = false
-            }; 
+            };
             var parcel2 = new Parcel
             {
                 Width = 300,
@@ -434,7 +419,7 @@ namespace ParcelService.Tests
                 Depth = 100,
                 IsFragile = false,
                 IsPriority = false
-            }; 
+            };
             var priorityParcel1 = new Parcel
             {
                 Width = 300,
@@ -465,6 +450,77 @@ namespace ParcelService.Tests
             Assert.Equal(2, pickedUpIds.Length);
             Assert.Contains(send3.DeliveryId, pickedUpIds);
             Assert.Contains(send4.DeliveryId, pickedUpIds);
+        }
+
+        [Fact]
+        public void DeliverParcels_WithParcelsAtBase_ThenDeliverToLocker()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel1 = CreateSmallParcel();
+            var parcel2 = CreateMediumParcel();
+
+            var send1 = service.ClientSend(parcel1, 1, 2);
+            var send2 = service.ClientSend(parcel2, 1, 2);
+
+            // First pickup the parcels
+            service.PickUpParcelsFromLocker(1);
+
+            // Act
+            var deliveredIds = service.DeliverParcels(2);
+
+            // Assert
+            Assert.Equal(2, deliveredIds.Length);
+            Assert.Contains(send1.DeliveryId, deliveredIds);
+            Assert.Contains(send2.DeliveryId, deliveredIds);
+        }
+
+        [Fact]
+        public void ClientReceive_WithValidDelivery_ShouldReturnShelfId()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel = CreateSmallParcel();
+            var sendResult = service.ClientSend(parcel, 1, 2);
+
+            // Simulate delivery process
+            service.PickUpParcelsFromLocker(1);
+            service.DeliverParcels(2);
+
+            // Act
+            int shelfId = service.ClientReceive(sendResult.DeliveryId, sendResult.SecurityCode);
+
+            // Assert
+            Assert.True(shelfId > 0);
+        }
+
+        [Fact]
+        public void ClientReceive_WithInvalidSecurityCode_ShouldThrowException()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel = CreateSmallParcel();
+            var sendResult = service.ClientSend(parcel, 1, 2);
+
+            service.PickUpParcelsFromLocker(1);
+            service.DeliverParcels(2);
+
+            // Act & Assert
+            Assert.Throws<InvalidSecurityCodeException>(() =>
+              service.ClientReceive(sendResult.DeliveryId, "INVALID"));
+        }
+
+        [Fact]
+        public void ClientReceive_WithNotYetDeliveredParcel_ShouldThrowException()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel = CreateSmallParcel();
+            var sendResult = service.ClientSend(parcel, 1, 2);
+
+            // Act & Assert
+            Assert.Throws<InvalidOperationException>(() =>
+              service.ClientReceive(sendResult.DeliveryId, sendResult.SecurityCode));
         }
     }
 }

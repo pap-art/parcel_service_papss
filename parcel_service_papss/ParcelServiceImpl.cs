@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ParcelService.Enums;
+using ParcelService.Exceptions;
 using ParcelService.Models;
 
 namespace ParcelService
@@ -37,6 +38,7 @@ namespace ParcelService
         private readonly Dictionary<int, ShelfSpace> _shelfSpaces = new Dictionary<int, ShelfSpace>();
         private int NEXT_DELIVERY_ID = 1;
         private readonly Random RANDOM = new Random();
+
 
         public (int DeliveryId, string SecurityCode, decimal Price) ClientSend(Parcel parcel, int fromLockerId, int toLockerId)
         {
@@ -335,9 +337,86 @@ namespace ParcelService
             delivery.PickedUpAt = DateTimeOffset.Now;
             delivery.ArrivedAtBaseAt = DateTimeOffset.Now;
             delivery.Status = DeliveryStatus.AtBase;
-            delivery.LocationShelfId = null; // No longer in a shelf
+            delivery.LocationShelfId = null;
+        }
+
+        public int[] DeliverParcels(int lockerId)
+        {
+            var locker = GetLockerById(lockerId);
+
+            var deliveriesToDeliver = _deliveries
+                .Where(d => d.ToLockerId == lockerId && d.Status == DeliveryStatus.AtBase)
+                .ToList();
+
+            return PlaceDeliveriesInLocker(deliveriesToDeliver, locker);
+        }
+
+        private int[] PlaceDeliveriesInLocker(List<DeliveryRecord> deliveries, ParcelLocker locker)
+        {
+            if (!deliveries.Any())
+            {
+                return Array.Empty<int>();
+            }
+
+            return deliveries
+                .Where(d => ProcessDeliveryToLocker(d, locker))
+                .Select(d => d.Id)
+                .ToArray();
+        }
+
+        private bool ProcessDeliveryToLocker(DeliveryRecord delivery, ParcelLocker locker)
+        {
+            var shelf = FindSuitableShelf(locker, delivery.Parcel);
+
+            if (shelf != null)
+            {
+                delivery.Status = DeliveryStatus.AwaitingCollection;
+                delivery.DeliveredToLockerAt = DateTimeOffset.Now;
+                delivery.LocationShelfId = shelf.Id;
+                AddParcelToShelf(shelf, delivery);
+
+                return true;
+            }
+
+            return false;
         }
 
 
+        public int ClientReceive(int deliveryId, string securityCode)
+        {
+            var delivery = ValidateClientReceiveInputs(deliveryId, securityCode);
+            var shelfId = delivery.LocationShelfId ??
+                throw new InvalidOperationException("Shelf ID not assigned");
+
+            // Update delivery status and free the space on the shelf
+            delivery.Status = DeliveryStatus.Delivered;
+            delivery.CollectedAt = DateTimeOffset.Now;
+            RemoveParcelFromShelf(shelfId, delivery.Id, delivery.Parcel);
+
+            return shelfId;
+        }
+
+
+        private DeliveryRecord ValidateClientReceiveInputs(int deliveryId, string securityCode)
+        {
+            var delivery = _deliveries.FirstOrDefault(d => d.Id == deliveryId);
+
+            if (delivery == null)
+            {
+                throw new ArgumentNullException($"Delivery with ID {deliveryId} not found");
+            }
+
+            if (delivery.SecurityCode != securityCode)
+            {
+                throw new InvalidSecurityCodeException("Invalid security code provided");
+            }
+
+            if (delivery.Status != DeliveryStatus.AwaitingCollection)
+            {
+                throw new InvalidOperationException($"Delivery is not ready for collection. Current status: {delivery.Status}");
+            }
+
+            return delivery;
+        }
     }
 }
