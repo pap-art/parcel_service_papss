@@ -150,7 +150,39 @@ namespace ParcelService.Tests
             Assert.Equal(expected, result.Price);
         }
 
-        
+        [Fact]
+        public void CalculatePrice_WhenSendPriorityParcel_ThenPriceIsDoubled()
+        {
+            // Arrange
+            var service = CreateService();
+            var standardParcel = CreateSmallParcel();
+            var priorityParcel = CreateSmallParcel(isPriority: true);
+
+            // Act
+            var standardPrice = service.ClientSend(standardParcel, 1, 2).Price;
+            var priorityPrice = service.ClientSend(priorityParcel, 1, 2).Price;
+
+            // Assert
+            Assert.Equal(2 * standardPrice, priorityPrice);
+        }
+
+        [Fact]
+        public void CalculatePrice_WhenSendFragileParcel_ThenPriceIsThirtyPercentMore()
+        {
+            // Arrange
+            var service = CreateService();
+            var standardParcel = CreateSmallParcel();
+            var priorityParcel = CreateSmallParcel(isFragile: true);
+
+            // Act
+            var standardPrice = service.ClientSend(standardParcel, 1, 2).Price;
+            var priorityPrice = service.ClientSend(priorityParcel, 1, 2).Price;
+
+            // Assert
+            Assert.Equal(1.3m * standardPrice, priorityPrice);
+        }
+
+
 
     }
 }

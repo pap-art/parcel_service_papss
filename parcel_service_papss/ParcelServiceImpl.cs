@@ -110,8 +110,8 @@ namespace ParcelService
             Parcel parcel, ParcelLocker fromLocker, ParcelLocker toLocker, ParcelShelfType shelfType)
         {
             var basePrice = CalculateBasePrice(fromLocker, toLocker, shelfType);
-            //return ApplyPriceModifiers(basePrice, parcel);
-            return basePrice;
+
+            return ApplyPriceModifiers(basePrice, parcel);
         }
 
         private decimal CalculateBasePrice(
@@ -128,14 +128,29 @@ namespace ParcelService
         {
             return shelfType switch
             {
-                ParcelShelfType.Small => 0.05m,
-                ParcelShelfType.Medium => 0.10m,
-                ParcelShelfType.Large => 0.40m,
+                ParcelShelfType.Small => SMALL_SHELF_PRICE_PER_UNIT,
+                ParcelShelfType.Medium => MEDIUM_SHELF_PRICE_PER_UNIT,
+                ParcelShelfType.Large => LARGE_SHELF_PRICE_PER_UNIT,
                 _ => throw new ArgumentOutOfRangeException(nameof(shelfType))
             };
         }
 
-        private ParcelShelf FindSuitableShelf(ParcelLocker locker, Parcel parcel)
+        private decimal ApplyPriceModifiers(decimal basePrice, Parcel parcel)
+        {
+            if (parcel.IsFragile)
+            {
+                basePrice *= FRAGILE_ITEM_MULTIPLIER;
+            }
+
+            if (parcel.IsPriority)
+            {
+                basePrice *= PRIORITY_ITEM_MULTIPLIER; 
+            }
+
+            return decimal.Round(basePrice, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private ParcelShelf? FindSuitableShelf(ParcelLocker locker, Parcel parcel)
         {
             return locker.ParcelShelves
                 .FirstOrDefault(shelf => DoesFitOnShelf(parcel, shelf.Type));
