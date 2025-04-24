@@ -257,5 +257,87 @@ namespace ParcelService
         {
             return (GetLockerById(fromLockerId), GetLockerById(toLockerId));
         }
+        public int[] PickUpParcelsFromLocker(int lockerId)
+        {
+            GetLockerById(lockerId); // Validate locker exists
+
+            var deliveriesToPickUp = GetAwaitingPickupDeliveries(lockerId);
+            if (!deliveriesToPickUp.Any())
+            {
+                return Array.Empty<int>();
+            }
+
+            var prioritizedDeliveries = PrioritizeDeliveriesForPickup(deliveriesToPickUp);
+            return ProcessPickupDeliveries(prioritizedDeliveries);
+        }
+
+        private List<DeliveryRecord> GetAwaitingPickupDeliveries(int lockerId)
+        {
+            return _deliveries
+                .Where(d => d.FromLockerId == lockerId && d.Status == DeliveryStatus.AwaitingPickup)
+                .ToList();
+        }
+
+        private List<DeliveryRecord> PrioritizeDeliveriesForPickup(List<DeliveryRecord> deliveries)
+        {
+            return deliveries
+                .OrderByDescending(d => d.Parcel.IsPriority)
+                .ThenBy(d => d.CreatedAt)
+                .ToList();
+        }
+
+        private int[] ProcessPickupDeliveries(List<DeliveryRecord> prioritizedDeliveries)
+        {
+            var pickedParcelIds = new List<int>();
+            var (currentWidth, currentHeight, currentDepth) = (0, 0, 0);
+
+            foreach (var delivery in prioritizedDeliveries)
+            {
+                if (CanFitInCourierVehicle(delivery.Parcel, ref currentWidth, ref currentHeight, ref currentDepth,
+                    COURIER_VEHICLE_MAX_WIDTH, COURIER_VEHICLE_MAX_HEIGHT, COURIER_VEHICLE_MAX_DEPTH) || delivery.Parcel.IsPriority)
+                {
+                    // Free the shelf space when parcel is picked up
+                    if (delivery.LocationShelfId.HasValue)
+                    {
+                        RemoveParcelFromShelf(delivery.LocationShelfId.Value, delivery.Id, delivery.Parcel);
+                    }
+
+                    UpdateDeliveryForPickup(delivery);
+                    pickedParcelIds.Add(delivery.Id);
+                }
+            }
+
+            return pickedParcelIds.ToArray();
+        }
+
+        private bool CanFitInCourierVehicle(
+            Parcel parcel, ref int currentWidth, ref int currentHeight, ref int currentDepth,
+            int maxWidth, int maxHeight, int maxDepth)
+        {
+            if (currentWidth + parcel.Width <= maxWidth &&
+                currentHeight + parcel.Height <= maxHeight &&
+                currentDepth + parcel.Depth <= maxDepth)
+            {
+                // Update dimensions used
+                currentWidth += parcel.Width;
+                currentHeight = Math.Max(currentHeight, parcel.Height);
+                currentDepth = Math.Max(currentDepth, parcel.Depth);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private void UpdateDeliveryForPickup(DeliveryRecord delivery)
+        {
+            delivery.Status = DeliveryStatus.InTransitToBase;
+            delivery.PickedUpAt = DateTimeOffset.Now;
+            delivery.ArrivedAtBaseAt = DateTimeOffset.Now;
+            delivery.Status = DeliveryStatus.AtBase;
+            delivery.LocationShelfId = null; // No longer in a shelf
+        }
+
+
     }
 }

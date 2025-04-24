@@ -84,9 +84,9 @@ namespace ParcelService.Tests
         {
             return new Parcel
             {
-                Width = 300,
+                Width = 200,
                 Height = 90,
-                Depth = 250,
+                Depth = 200,
                 IsFragile = isFragile,
                 IsPriority = isPriority
             };
@@ -266,7 +266,205 @@ namespace ParcelService.Tests
             Assert.Throws<ArgumentNullException>(() => service.ClientSend(lastParcel, 1, 2));
         }
 
+        [Fact]
+        public void PickUpParcelsFromLocker_WithParcelsWaiting_ShouldReturnDeliveryIds()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel1 = CreateSmallParcel();
+            var parcel2 = CreateMediumParcel();
 
+            var send1 = service.ClientSend(parcel1, 1, 2);
+            var send2 = service.ClientSend(parcel2, 1, 3);
 
+            // Act
+            var pickedUpIds = service.PickUpParcelsFromLocker(1);
+
+            // Assert
+            Assert.Equal(2, pickedUpIds.Length);
+            Assert.Contains(send1.DeliveryId, pickedUpIds);
+            Assert.Contains(send2.DeliveryId, pickedUpIds);
+        }
+
+        [Fact]
+        public void PickUpParcelsFromLocker_WithPriorityParcels_ShouldPickupPriorityFirst()
+        {
+            // Arrange
+            var service = CreateService();
+            var normalParcel = CreateMediumParcel();
+            var priorityParcel = CreateMediumParcel(isPriority: true);
+
+            var send1 = service.ClientSend(normalParcel, 1, 2);
+            var send2 = service.ClientSend(priorityParcel, 1, 3);
+
+            // Act
+            var pickedUpIds = service.PickUpParcelsFromLocker(1);
+
+            // Assert
+            Assert.Contains(send2.DeliveryId, pickedUpIds); // Priority should always be included
+        }
+
+        [Fact]
+        public void PickUpParcelsFromLocker_WithNoWaitingParcels_ShouldReturnEmptyArray()
+        {
+            // Arrange
+            var service = CreateService();
+
+            // Act
+            var pickedUpIds = service.PickUpParcelsFromLocker(1);
+
+            // Assert
+            Assert.Empty(pickedUpIds);
+        }
+
+        [Fact]
+        public void PickUpParcels_WhenParcelVolumeBiggerThanTransport_ThenDoNotPickUpAllParcels()
+        {
+            // Arrange
+            var service = new ParcelServiceImpl
+            {
+                CompanyName = "3 Medium Shelves Co",
+                ParcelLockers = new[]
+                {
+                    CreateTestLocker(1, 100, new[]
+                    {
+                        (1, ParcelShelfType.Large),
+                        (2, ParcelShelfType.Large),
+                        (3, ParcelShelfType.Large)
+                    }),
+                    CreateTestLocker(2, 200, new[]
+                    {
+                        (4, ParcelShelfType.Large),
+                        (5, ParcelShelfType.Large),
+                        (6, ParcelShelfType.Large)
+                    }),
+                    CreateTestLocker(3, 300, new[]
+                    {
+                        (7, ParcelShelfType.Large),
+                        (8, ParcelShelfType.Large),
+                        (9, ParcelShelfType.Large)
+                    })
+                }
+            };
+
+            // Create parcels that collectively exceed vehicle capacity (800x200x200)
+            var parcel1 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = false
+            }; 
+            var parcel2 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = false
+            }; 
+            var parcel3 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = false
+            };
+
+            // Send all three parcels
+            var send1 = service.ClientSend(parcel1, 1, 2);
+            var send2 = service.ClientSend(parcel2, 1, 2);
+            var send3 = service.ClientSend(parcel3, 1, 2);
+
+            // Act
+            var pickedUpIds = service.PickUpParcelsFromLocker(1);
+
+            // Assert
+            Assert.Equal(2, pickedUpIds.Length); // Should pick up only 2 of the 3 parcels
+        }
+
+        [Fact]
+        public void PickUpParcels_WhenParcelVolumeBiggerThanTransport_ThenGivePriorityFirst()
+        {
+            // Arrange
+            var service = new ParcelServiceImpl
+            {
+                CompanyName = "3 Medium Shelves Co",
+                ParcelLockers = new[]
+                {
+                    CreateTestLocker(1, 100, new[]
+                    {
+                        (1, ParcelShelfType.Large),
+                        (2, ParcelShelfType.Large),
+                        (3, ParcelShelfType.Large),
+                        (4, ParcelShelfType.Large)
+                    }),
+                    CreateTestLocker(2, 200, new[]
+                    {
+                        (5, ParcelShelfType.Large),
+                        (6, ParcelShelfType.Large),
+                        (7, ParcelShelfType.Large),
+                        (8, ParcelShelfType.Large)
+                    }),
+                    CreateTestLocker(3, 300, new[]
+                    {
+                        (9, ParcelShelfType.Large),
+                        (10, ParcelShelfType.Large),
+                        (11, ParcelShelfType.Large),
+                        (12, ParcelShelfType.Large)
+                    })
+                }
+            };
+
+            // Create parcels that collectively exceed vehicle capacity (800x200x200)
+            var parcel1 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = false
+            }; 
+            var parcel2 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = false
+            }; 
+            var priorityParcel1 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = true
+            };
+            var priorityParcel2 = new Parcel
+            {
+                Width = 300,
+                Height = 100,
+                Depth = 100,
+                IsFragile = false,
+                IsPriority = true
+            };
+
+            // Send all three parcels
+            var send1 = service.ClientSend(parcel1, 1, 2);
+            var send2 = service.ClientSend(parcel2, 1, 2);
+            var send3 = service.ClientSend(priorityParcel1, 1, 2);
+            var send4 = service.ClientSend(priorityParcel2, 1, 2);
+
+            // Act
+            var pickedUpIds = service.PickUpParcelsFromLocker(1);
+
+            // Assert
+            Assert.Equal(2, pickedUpIds.Length);
+            Assert.Contains(send3.DeliveryId, pickedUpIds);
+            Assert.Contains(send4.DeliveryId, pickedUpIds);
+        }
     }
 }
