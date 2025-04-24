@@ -31,6 +31,7 @@ namespace ParcelService
         private const decimal MEDIUM_SHELF_PRICE_PER_UNIT = 0.10m;
         private const decimal LARGE_SHELF_PRICE_PER_UNIT = 0.40m;
 
+        // Price multipliers
         private const decimal FRAGILE_ITEM_MULTIPLIER = 1.3m;
         private const decimal PRIORITY_ITEM_MULTIPLIER = 2.0m;
 
@@ -48,7 +49,7 @@ namespace ParcelService
             var (shelf, price) = FindShelfAndCalculatePrice(fromLocker, toLocker, parcel);
             var delivery = CreateDeliveryRecord(parcel, fromLockerId, toLockerId, price, shelf.Id);
             AddParcelToShelf(shelf, delivery);
-            _deliveries.Add(delivery); // Fixed the issue by using Add method directly without assignment  
+            _deliveries.Add(delivery);
 
             return (delivery.Id, delivery.SecurityCode, delivery.Price);
         }
@@ -88,8 +89,6 @@ namespace ParcelService
             if (shelf == null)
             {
                 throw new ArgumentNullException(nameof(shelf), $"No suitable shelf found in locker {fromLocker.Id} for the given parcel dimensions");
-                //throw new NoSuitableShelfException(
-                //    $"No suitable shelf found in locker {fromLocker.Id} for the given parcel dimensions");
             }
 
             var price = CalculatePrice(parcel, fromLocker, toLocker, shelf.Type);
@@ -143,7 +142,6 @@ namespace ParcelService
 
         private ParcelShelf FindSuitableShelf(ParcelLocker locker, Parcel parcel)
         {
-            // Initialize any shelves that haven't been used before
             foreach (var shelf in locker.ParcelShelves)
             {
                 InitializeShelfSpaceIfNeeded(shelf);
@@ -159,7 +157,6 @@ namespace ParcelService
                 return null;
             }
 
-            // Find the shelf with the least available space to optimize usage
             return suitableShelves
                 .OrderBy(shelf => _shelfSpaces[shelf.Id].AvailableWidth *
                                  _shelfSpaces[shelf.Id].AvailableHeight *
@@ -197,15 +194,12 @@ namespace ParcelService
         {
             if (isRemoval)
             {
-                // When removing, increase available space (simplified model)
-                // In a real system, this would handle complex space management
                 shelfSpace.AvailableWidth += parcel.Width;
                 shelfSpace.AvailableHeight += parcel.Height;
                 shelfSpace.AvailableDepth += parcel.Depth;
             }
             else
             {
-                // When adding, decrease available space
                 shelfSpace.AvailableWidth -= parcel.Width;
                 shelfSpace.AvailableHeight -= parcel.Height;
                 shelfSpace.AvailableDepth -= parcel.Depth;
@@ -249,7 +243,6 @@ namespace ParcelService
             if (locker == null)
             {
                 throw new ArgumentNullException(nameof(lockerId), $"Locker with ID {lockerId} not found");
-                //throw new LockerNotFoundException($"Locker with ID {lockerId} not found");
             }
 
             return locker;
@@ -417,6 +410,48 @@ namespace ParcelService
             }
 
             return delivery;
+        }
+
+        public (int Year, int Month, decimal Income) GetMonthlyIncomeReport()
+        {
+            var monthlyIncome = _deliveries
+                .GroupBy(delivery => new { delivery.CreatedAt.Year, delivery.CreatedAt.Month })
+                .Select(month => new
+                {
+                    month.Key.Year,
+                    month.Key.Month,
+                    Income = month.Sum(delivery => delivery.Price)
+                })
+                .ToList();
+            return monthlyIncome
+                .Select(date => (date.Year, date.Month, date.Income))
+                .FirstOrDefault();
+        }
+
+        private List<DeliveryRecord> GetCompletedDeliveriesInPeriod(
+            DateTimeOffset periodStart, DateTimeOffset periodEnd)
+        {
+            return _deliveries
+                .Where(d => d.Status == DeliveryStatus.Delivered)
+                .Where(d => d.CreatedAt >= periodStart &&
+                            d.CollectedAt <= periodEnd &&
+                            d.CollectedAt.HasValue)
+                .ToList();
+        }
+
+        public TimeSpan GetAverageDeliveryTime(DateTimeOffset periodStart, DateTimeOffset periodEnd)
+        {
+            var completedDeliveries = GetCompletedDeliveriesInPeriod(periodStart, periodEnd);
+
+            if (!completedDeliveries.Any())
+            {
+                return TimeSpan.Zero;
+            }
+
+            var avgSeconds = completedDeliveries
+                .Average(d => (d.CollectedAt!.Value - d.CreatedAt).TotalSeconds);
+
+            return TimeSpan.FromSeconds(avgSeconds);
         }
     }
 }

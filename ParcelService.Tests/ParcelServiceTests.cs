@@ -17,22 +17,22 @@ namespace ParcelService.Tests
             {
                 CompanyName = "Test Parcel Service",
                 ParcelLockers = new[] {
-            CreateTestLocker(1, 100, new [] {
-                (1, ParcelShelfType.Small),
-                (2, ParcelShelfType.Medium),
-                (3, ParcelShelfType.Large)
-              }),
-              CreateTestLocker(2, 200, new [] {
-                (4, ParcelShelfType.Small),
-                (5, ParcelShelfType.Medium),
-                (6, ParcelShelfType.Large)
-              }),
-              CreateTestLocker(3, 300, new [] {
-                (7, ParcelShelfType.Small),
-                (8, ParcelShelfType.Medium),
-                (9, ParcelShelfType.Large)
-              })
-          }
+                    CreateTestLocker(1, 100, new [] {
+                        (1, ParcelShelfType.Small),
+                        (2, ParcelShelfType.Medium),
+                        (3, ParcelShelfType.Large)
+                      }),
+                    CreateTestLocker(2, 200, new [] {
+                        (4, ParcelShelfType.Small),
+                        (5, ParcelShelfType.Medium),
+                        (6, ParcelShelfType.Large)
+                    }),
+                    CreateTestLocker(3, 300, new [] {
+                        (7, ParcelShelfType.Small),
+                        (8, ParcelShelfType.Medium),
+                        (9, ParcelShelfType.Large)
+                    })
+                }
             };
 
             return service;
@@ -521,6 +521,51 @@ namespace ParcelService.Tests
             // Act & Assert
             Assert.Throws<InvalidOperationException>(() =>
               service.ClientReceive(sendResult.DeliveryId, sendResult.SecurityCode));
+        }
+
+        [Fact]
+        public void GetMonthlyIncomeReport_WithDeliveries_ShouldReturnCorrectIncome()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel1 = CreateSmallParcel();
+            var parcel2 = CreateMediumParcel(isPriority: true);
+
+            var send1 = service.ClientSend(parcel1, 1, 2);
+            var send2 = service.ClientSend(parcel2, 1, 3);
+
+            decimal expectedIncome = send1.Price + send2.Price;
+
+            // Act
+            var report = service.GetMonthlyIncomeReport();
+
+            // Assert
+            Assert.Equal(DateTime.Now.Year, report.Year);
+            Assert.Equal(DateTime.Now.Month, report.Month);
+            Assert.Equal(expectedIncome, report.Income);
+        }
+
+        [Fact]
+        public void GetAverageDeliveryTime_WithCompletedDeliveries_ShouldCalculateAverage()
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel = CreateSmallParcel();
+
+            var sendResult = service.ClientSend(parcel, 1, 2);
+
+            service.PickUpParcelsFromLocker(1);
+            service.DeliverParcels(2);
+            service.ClientReceive(sendResult.DeliveryId, sendResult.SecurityCode);
+
+            var periodStart = DateTimeOffset.Now.AddDays(-1);
+            var periodEnd = DateTimeOffset.Now.AddDays(1);
+
+            // Act
+            var averageTime = service.GetAverageDeliveryTime(periodStart, periodEnd);
+
+            // Assert
+            Assert.True(averageTime.TotalSeconds > 0);
         }
     }
 }
