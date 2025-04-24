@@ -109,6 +109,47 @@ namespace ParcelService.Tests
             Assert.True(result.Price > 0);
         }
 
+
+        [Fact]
+        public void GenerateSecurityCode_WhenCalled_ThenReturnsValidCode()
+        {
+            // Arrange
+            var service = CreateService();
+
+            // Act
+            var code = service.GenerateSecurityCode();
+
+            // Assert
+            Assert.NotNull(code);
+            Assert.Equal(6, code.Length);
+            Assert.All(code, c => Assert.True(char.IsDigit(c)));
+        }
+
+        [Theory]
+        [InlineData(40, 50, 60, 15)]
+        [InlineData(90, 50, 150, 30)]
+        [InlineData(300, 90, 250, 120)]
+
+        public void CalculatePrice_WhenSendParcelAndDistanceThreeHundred_ThenReturnsPriceModifierTimesDistance(int parcelWidth, int parcelHeight, int parcelDepth, decimal expected)
+        {
+            // Arrange
+            var service = CreateService();
+            var parcel = new Parcel
+            {
+                Width = parcelWidth,
+                Height = parcelHeight,
+                Depth = parcelDepth,
+                IsFragile = false,
+                IsPriority = false
+            };
+
+            // Act
+            var result = service.ClientSend(parcel, 1, 2);
+
+            // Assert
+            Assert.Equal(expected, result.Price);
+        }
+
         
 
     }
