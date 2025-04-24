@@ -60,9 +60,9 @@ namespace ParcelService.Tests
         {
             return new Parcel
             {
-                Width = 40,
-                Height = 50,
-                Depth = 60,
+                Width = 4,
+                Height = 5,
+                Depth = 6,
                 IsFragile = isFragile,
                 IsPriority = isPriority
             };
@@ -180,6 +180,90 @@ namespace ParcelService.Tests
 
             // Assert
             Assert.Equal(1.3m * standardPrice, priorityPrice);
+        }
+
+
+        [Fact]
+        public void ClientSend_WhenSmallParcelFitsOnEmptySmallShelfAndSecondParcelIsSent_ThenFirstParcelTakesAllSmallShelfAndSecondOverflowsToMediumShelf()
+        {
+            // Arrange
+            var service = CreateService();
+            var firstParcel = new Parcel
+            {
+                Width = 50,
+                Height = 60,
+                Depth = 70,
+                IsFragile = false,
+                IsPriority = false
+            };
+            var secondParcel = new Parcel
+            {
+                Width = 1,
+                Height = 1,
+                Depth = 1,
+                IsFragile = false,
+                IsPriority = false
+            };
+
+            // Act
+            var firstResult = service.ClientSend(firstParcel, 1, 2);
+            var secondResult = service.ClientSend(secondParcel, 1, 2);
+
+            // Assert
+            Assert.True(firstResult.DeliveryId > 0);
+            Assert.NotEmpty(firstResult.SecurityCode);
+            Assert.Equal(15m, firstResult.Price);  
+            Assert.True(secondResult.DeliveryId > 0);
+            Assert.NotEmpty(secondResult.SecurityCode);
+            //takes space in medium shelf, hence twice the price
+            Assert.Equal(30m, secondResult.Price);
+        }
+
+        [Fact]
+        public void ClientSend_WhenAllShelvesAreFull_ThenThrowsArgumentNullException()
+        {
+        // Arrange
+            var service = CreateService();
+            
+            var smallFillingparcel = new Parcel
+            {
+                Width = ShelfSpace.SMALL_SHELF_WIDTH,
+                Height = ShelfSpace.SMALL_SHELF_HEIGHT,
+                Depth = ShelfSpace.SMALL_SHELF_DEPTH,
+                IsFragile = false,
+                IsPriority = false
+            };
+            var mediumFillingparcel = new Parcel
+            {
+                Width = ShelfSpace.MEDIUM_SHELF_WIDTH,
+                Height = ShelfSpace.MEDIUM_SHELF_HEIGHT,
+                Depth = ShelfSpace.MEDIUM_SHELF_DEPTH,
+                IsFragile = false,
+                IsPriority = false
+            };
+            var bigFillingparcel = new Parcel
+            {
+                Width = ShelfSpace.LARGE_SHELF_WIDTH,
+                Height = ShelfSpace.LARGE_SHELF_HEIGHT,
+                Depth = ShelfSpace.LARGE_SHELF_DEPTH,
+                IsFragile = false,
+                IsPriority = false
+            };
+            var lastParcel = new Parcel
+            {
+                Width = 1,
+                Height = 1,
+                Depth = 1,
+                IsFragile = false,
+                IsPriority = false
+            };
+
+            service.ClientSend(smallFillingparcel, 1, 2);
+            service.ClientSend(mediumFillingparcel, 1, 2);
+            service.ClientSend(bigFillingparcel, 1, 2);
+
+            // Act & Assert
+            Assert.Throws<ArgumentNullException>(() => service.ClientSend(lastParcel, 1, 2));
         }
 
 

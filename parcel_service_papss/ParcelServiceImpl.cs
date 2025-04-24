@@ -20,19 +20,6 @@ namespace ParcelService
         private const int SECURITY_CODE_LENGTH = 6;
         private const int NUMBER_OF_DIGITS = 10; // 0-9
 
-        // Shelf dimensions
-        private const int SMALL_SHELF_WIDTH = 50;
-        private const int SMALL_SHELF_HEIGHT = 60;
-        private const int SMALL_SHELF_DEPTH = 70;
-
-        private const int MEDIUM_SHELF_WIDTH = 100;
-        private const int MEDIUM_SHELF_HEIGHT = 60;
-        private const int MEDIUM_SHELF_DEPTH = 200;
-
-        private const int LARGE_SHELF_WIDTH = 400;
-        private const int LARGE_SHELF_HEIGHT = 100;
-        private const int LARGE_SHELF_DEPTH = 300;
-
         // Courier vehicle dimensions  
         private const int COURIER_VEHICLE_MAX_WIDTH = 800;
         private const int COURIER_VEHICLE_MAX_HEIGHT = 200;
@@ -47,6 +34,7 @@ namespace ParcelService
         private const decimal PRIORITY_ITEM_MULTIPLIER = 2.0m;
 
         private List<DeliveryRecord> _deliveries = new List<DeliveryRecord>();
+        private readonly Dictionary<int, ShelfSpace> _shelfSpaces = new Dictionary<int, ShelfSpace>();
         private int NEXT_DELIVERY_ID = 1;
         private readonly Random RANDOM = new Random();
 
@@ -56,7 +44,8 @@ namespace ParcelService
             var (fromLocker, toLocker) = GetSourceAndDestinationLockers(fromLockerId, toLockerId);
 
             var (shelf, price) = FindShelfAndCalculatePrice(fromLocker, toLocker, parcel);
-            var delivery = CreateDeliveryRecord(parcel, fromLockerId, toLockerId, price, 0);
+            var delivery = CreateDeliveryRecord(parcel, fromLockerId, toLockerId, price, shelf.Id);
+            AddParcelToShelf(shelf, delivery);
             _deliveries.Add(delivery); // Fixed the issue by using Add method directly without assignment  
 
             return (delivery.Id, delivery.SecurityCode, delivery.Price);
@@ -150,25 +139,104 @@ namespace ParcelService
             return decimal.Round(basePrice, 2, MidpointRounding.AwayFromZero);
         }
 
-        private ParcelShelf? FindSuitableShelf(ParcelLocker locker, Parcel parcel)
+        private ParcelShelf FindSuitableShelf(ParcelLocker locker, Parcel parcel)
         {
-            return locker.ParcelShelves
-                .FirstOrDefault(shelf => DoesFitOnShelf(parcel, shelf.Type));
+            // Initialize any shelves that haven't been used before
+            foreach (var shelf in locker.ParcelShelves)
+            {
+                InitializeShelfSpaceIfNeeded(shelf);
+            }
+
+            // Find shelves with enough available space
+            var suitableShelves = locker.ParcelShelves
+                .Where(shelf => DoesFitOnShelf(parcel, shelf))
+                .ToList();
+
+            if (!suitableShelves.Any())
+            {
+                return null;
+            }
+
+            // Find the shelf with the least available space to optimize usage
+            return suitableShelves
+                .OrderBy(shelf => _shelfSpaces[shelf.Id].AvailableWidth *
+                                 _shelfSpaces[shelf.Id].AvailableHeight *
+                                 _shelfSpaces[shelf.Id].AvailableDepth)
+                .First();
         }
 
-        private bool DoesFitOnShelf(Parcel parcel, ParcelShelfType shelfType)
+        private void InitializeShelfSpaceIfNeeded(ParcelShelf shelf)
+        {
+            if (!_shelfSpaces.ContainsKey(shelf.Id))
+            {
+                _shelfSpaces[shelf.Id] = ShelfSpace.CreateForShelfType(shelf.Type);
+            }
+        }
+
+        private void AddParcelToShelf(ParcelShelf shelf, DeliveryRecord delivery)
+        {
+            InitializeShelfSpaceIfNeeded(shelf);
+
+            var shelfSpace = _shelfSpaces[shelf.Id];
+            shelfSpace.ParcelIds.Add(delivery.Id);
+            UpdateAvailableSpace(shelfSpace, delivery.Parcel, false);
+        }
+
+        private void RemoveParcelFromShelf(int shelfId, int parcelId, Parcel parcel)
+        {
+            if (_shelfSpaces.TryGetValue(shelfId, out var shelfSpace))
+            {
+                shelfSpace.ParcelIds.Remove(parcelId);
+                UpdateAvailableSpace(shelfSpace, parcel, true);
+            }
+        }
+
+        private void UpdateAvailableSpace(ShelfSpace shelfSpace, Parcel parcel, bool isRemoval)
+        {
+            if (isRemoval)
+            {
+                // When removing, increase available space (simplified model)
+                // In a real system, this would handle complex space management
+                shelfSpace.AvailableWidth += parcel.Width;
+                shelfSpace.AvailableHeight += parcel.Height;
+                shelfSpace.AvailableDepth += parcel.Depth;
+            }
+            else
+            {
+                // When adding, decrease available space
+                shelfSpace.AvailableWidth -= parcel.Width;
+                shelfSpace.AvailableHeight -= parcel.Height;
+                shelfSpace.AvailableDepth -= parcel.Depth;
+            }
+        }
+
+        private bool CanFitOnShelfSpace(Parcel parcel, ShelfSpace shelfSpace)
+        {
+            return parcel.Width <= shelfSpace.AvailableWidth &&
+                  parcel.Height <= shelfSpace.AvailableHeight &&
+                  parcel.Depth <= shelfSpace.AvailableDepth;
+        }
+
+        private bool DoesFitOnShelf(Parcel parcel, ParcelShelf shelf)
         {
 
-            return shelfType switch
+            if (!DoesFitOnShelfType(parcel, shelf.Type))
             {
-                ParcelShelfType.Small =>
-                parcel.Width <= SMALL_SHELF_WIDTH && parcel.Height <= SMALL_SHELF_HEIGHT && parcel.Depth <= SMALL_SHELF_DEPTH,
-                ParcelShelfType.Medium =>
-                parcel.Width <= MEDIUM_SHELF_WIDTH && parcel.Height <= MEDIUM_SHELF_HEIGHT && parcel.Depth <= MEDIUM_SHELF_DEPTH,
-                ParcelShelfType.Large =>
-                parcel.Width <= LARGE_SHELF_WIDTH && parcel.Height <= LARGE_SHELF_HEIGHT && parcel.Depth <= LARGE_SHELF_DEPTH,
-                _ => false
-            };
+                return false;
+            }
+
+            // Then check if there's available space on this specific shelf
+            InitializeShelfSpaceIfNeeded(shelf);
+            return CanFitOnShelfSpace(parcel, _shelfSpaces[shelf.Id]);
+        }
+
+        private bool DoesFitOnShelfType(Parcel parcel, ParcelShelfType shelfType)
+        {
+            var space = ShelfSpace.CreateForShelfType(shelfType);
+
+            return parcel.Width <= space.AvailableWidth &&
+                  parcel.Height <= space.AvailableHeight &&
+                  parcel.Depth <= space.AvailableDepth;
         }
 
 
