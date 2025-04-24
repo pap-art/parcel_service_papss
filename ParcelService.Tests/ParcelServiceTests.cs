@@ -213,7 +213,7 @@ namespace ParcelService.Tests
         }
 
         [Fact]
-        public void ClientSend_WhenAllShelvesAreFull_ThenThrowsArgumentNullException()
+        public void ClientSend_WhenAllShelvesAreFull_ThenThrowsNoSpaceInLockerException()
         {
             // Arrange
             var service = CreateService();
@@ -256,7 +256,7 @@ namespace ParcelService.Tests
             service.ClientSend(bigFillingparcel, 1, 2);
 
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => service.ClientSend(lastParcel, 1, 2));
+            Assert.Throws<NoSpaceInLockerException>(() => service.ClientSend(lastParcel, 1, 2));
         }
 
         [Fact]

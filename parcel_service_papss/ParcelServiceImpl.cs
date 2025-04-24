@@ -12,11 +12,6 @@ namespace ParcelService
 {
     public class ParcelServiceImpl
     {
-        public string CompanyName { get; set; }
-         
-        public ParcelLocker[] ParcelLockers { get; set; }
-
-
         // Security code
         private const int SECURITY_CODE_LENGTH = 6;
         private const int NUMBER_OF_DIGITS = 10; // 0-9
@@ -35,11 +30,14 @@ namespace ParcelService
         private const decimal FRAGILE_ITEM_MULTIPLIER = 1.3m;
         private const decimal PRIORITY_ITEM_MULTIPLIER = 2.0m;
 
+        public string CompanyName{ get; set; }
+
+        public ParcelLocker[] ParcelLockers{ get; set; }
+
         private List<DeliveryRecord> _deliveries = new List<DeliveryRecord>();
         private readonly Dictionary<int, ShelfSpace> _shelfSpaces = new Dictionary<int, ShelfSpace>();
         private int NEXT_DELIVERY_ID = 1;
         private readonly Random RANDOM = new Random();
-
 
         public (int DeliveryId, string SecurityCode, decimal Price) ClientSend(Parcel parcel, int fromLockerId, int toLockerId)
         {
@@ -73,22 +71,21 @@ namespace ParcelService
         public string GenerateSecurityCode()
         {
             return new string(
-                      Enumerable.Range(0, SECURITY_CODE_LENGTH) 
-                     .Select(_ => RANDOM.Next(0, NUMBER_OF_DIGITS))  
-                     .Select(n => n.ToString()[0])   
-                     .ToArray());
+              Enumerable.Range(0, SECURITY_CODE_LENGTH)
+              .Select(_ => RANDOM.Next(0, NUMBER_OF_DIGITS))
+              .Select(n => n.ToString()[0])
+              .ToArray());
         }
 
         private (ParcelShelf Shelf, decimal Price) FindShelfAndCalculatePrice(
-            ParcelLocker fromLocker, ParcelLocker toLocker, Parcel parcel)
+          ParcelLocker fromLocker, ParcelLocker toLocker, Parcel parcel)
         {
-
 
             var shelf = FindSuitableShelf(fromLocker, parcel);
 
             if (shelf == null)
             {
-                throw new ArgumentNullException(nameof(shelf), $"No suitable shelf found in locker {fromLocker.Id} for the given parcel dimensions");
+                throw new NoSpaceInLockerException(nameof(fromLocker), $"No suitable shelf found in locker {fromLocker.Id} for the given parcel dimensions");
             }
 
             var price = CalculatePrice(parcel, fromLocker, toLocker, shelf.Type);
@@ -97,7 +94,7 @@ namespace ParcelService
         }
 
         private decimal CalculatePrice(
-            Parcel parcel, ParcelLocker fromLocker, ParcelLocker toLocker, ParcelShelfType shelfType)
+          Parcel parcel, ParcelLocker fromLocker, ParcelLocker toLocker, ParcelShelfType shelfType)
         {
             var basePrice = CalculateBasePrice(fromLocker, toLocker, shelfType);
 
@@ -105,7 +102,7 @@ namespace ParcelService
         }
 
         private decimal CalculateBasePrice(
-            ParcelLocker fromLocker, ParcelLocker toLocker, ParcelShelfType shelfType)
+          ParcelLocker fromLocker, ParcelLocker toLocker, ParcelShelfType shelfType)
         {
             var pricePerUnit = GetPricePerDistanceUnit(shelfType);
 
@@ -116,12 +113,14 @@ namespace ParcelService
 
         private decimal GetPricePerDistanceUnit(ParcelShelfType shelfType)
         {
-            return shelfType switch
+            return shelfType
+            switch
             {
                 ParcelShelfType.Small => SMALL_SHELF_PRICE_PER_UNIT,
                 ParcelShelfType.Medium => MEDIUM_SHELF_PRICE_PER_UNIT,
                 ParcelShelfType.Large => LARGE_SHELF_PRICE_PER_UNIT,
-                _ => throw new ArgumentOutOfRangeException(nameof(shelfType))
+                _ =>
+                throw new ArgumentOutOfRangeException(nameof(shelfType))
             };
         }
 
@@ -134,7 +133,7 @@ namespace ParcelService
 
             if (parcel.IsPriority)
             {
-                basePrice *= PRIORITY_ITEM_MULTIPLIER; 
+                basePrice *= PRIORITY_ITEM_MULTIPLIER;
             }
 
             return decimal.Round(basePrice, 2, MidpointRounding.AwayFromZero);
@@ -149,8 +148,8 @@ namespace ParcelService
 
             // Find shelves with enough available space
             var suitableShelves = locker.ParcelShelves
-                .Where(shelf => DoesFitOnShelf(parcel, shelf))
-                .ToList();
+              .Where(shelf => DoesFitOnShelf(parcel, shelf))
+              .ToList();
 
             if (!suitableShelves.Any())
             {
@@ -158,10 +157,10 @@ namespace ParcelService
             }
 
             return suitableShelves
-                .OrderBy(shelf => _shelfSpaces[shelf.Id].AvailableWidth *
-                                 _shelfSpaces[shelf.Id].AvailableHeight *
-                                 _shelfSpaces[shelf.Id].AvailableDepth)
-                .First();
+              .OrderBy(shelf => _shelfSpaces[shelf.Id].AvailableWidth *
+                _shelfSpaces[shelf.Id].AvailableHeight *
+                _shelfSpaces[shelf.Id].AvailableDepth)
+              .First();
         }
 
         private void InitializeShelfSpaceIfNeeded(ParcelShelf shelf)
@@ -183,7 +182,8 @@ namespace ParcelService
 
         private void RemoveParcelFromShelf(int shelfId, int parcelId, Parcel parcel)
         {
-            if (_shelfSpaces.TryGetValue(shelfId, out var shelfSpace))
+            if (_shelfSpaces.TryGetValue(shelfId, out
+                var shelfSpace))
             {
                 shelfSpace.ParcelIds.Remove(parcelId);
                 UpdateAvailableSpace(shelfSpace, parcel, true);
@@ -209,8 +209,8 @@ namespace ParcelService
         private bool CanFitOnShelfSpace(Parcel parcel, ShelfSpace shelfSpace)
         {
             return parcel.Width <= shelfSpace.AvailableWidth &&
-                  parcel.Height <= shelfSpace.AvailableHeight &&
-                  parcel.Depth <= shelfSpace.AvailableDepth;
+              parcel.Height <= shelfSpace.AvailableHeight &&
+              parcel.Depth <= shelfSpace.AvailableDepth;
         }
 
         private bool DoesFitOnShelf(Parcel parcel, ParcelShelf shelf)
@@ -231,10 +231,9 @@ namespace ParcelService
             var space = ShelfSpace.CreateForShelfType(shelfType);
 
             return parcel.Width <= space.AvailableWidth &&
-                  parcel.Height <= space.AvailableHeight &&
-                  parcel.Depth <= space.AvailableDepth;
+              parcel.Height <= space.AvailableHeight &&
+              parcel.Depth <= space.AvailableDepth;
         }
-
 
         private ParcelLocker GetLockerById(int lockerId)
         {
@@ -242,7 +241,7 @@ namespace ParcelService
 
             if (locker == null)
             {
-                throw new ArgumentNullException(nameof(lockerId), $"Locker with ID {lockerId} not found");
+                throw new LockerNotFoundException(nameof(lockerId), $"Locker with ID {lockerId} not found");
             }
 
             return locker;
@@ -269,16 +268,16 @@ namespace ParcelService
         private List<DeliveryRecord> GetAwaitingPickupDeliveries(int lockerId)
         {
             return _deliveries
-                .Where(d => d.FromLockerId == lockerId && d.Status == DeliveryStatus.AwaitingPickup)
-                .ToList();
+              .Where(d => d.FromLockerId == lockerId && d.Status == DeliveryStatus.AwaitingPickup)
+              .ToList();
         }
 
         private List<DeliveryRecord> PrioritizeDeliveriesForPickup(List<DeliveryRecord> deliveries)
         {
             return deliveries
-                .OrderByDescending(d => d.Parcel.IsPriority)
-                .ThenBy(d => d.CreatedAt)
-                .ToList();
+              .OrderByDescending(d => d.Parcel.IsPriority)
+              .ThenBy(d => d.CreatedAt)
+              .ToList();
         }
 
         private int[] ProcessPickupDeliveries(List<DeliveryRecord> prioritizedDeliveries)
@@ -306,12 +305,12 @@ namespace ParcelService
         }
 
         private bool CanFitInCourierVehicle(
-            Parcel parcel, ref int currentWidth, ref int currentHeight, ref int currentDepth,
-            int maxWidth, int maxHeight, int maxDepth)
+          Parcel parcel, ref int currentWidth, ref int currentHeight, ref int currentDepth,
+          int maxWidth, int maxHeight, int maxDepth)
         {
             if (currentWidth + parcel.Width <= maxWidth &&
-                currentHeight + parcel.Height <= maxHeight &&
-                currentDepth + parcel.Depth <= maxDepth)
+              currentHeight + parcel.Height <= maxHeight &&
+              currentDepth + parcel.Depth <= maxDepth)
             {
                 // Update dimensions used
                 currentWidth += parcel.Width;
@@ -338,8 +337,8 @@ namespace ParcelService
             var locker = GetLockerById(lockerId);
 
             var deliveriesToDeliver = _deliveries
-                .Where(d => d.ToLockerId == lockerId && d.Status == DeliveryStatus.AtBase)
-                .ToList();
+              .Where(d => d.ToLockerId == lockerId && d.Status == DeliveryStatus.AtBase)
+              .ToList();
 
             return PlaceDeliveriesInLocker(deliveriesToDeliver, locker);
         }
@@ -352,9 +351,9 @@ namespace ParcelService
             }
 
             return deliveries
-                .Where(d => ProcessDeliveryToLocker(d, locker))
-                .Select(d => d.Id)
-                .ToArray();
+              .Where(d => ProcessDeliveryToLocker(d, locker))
+              .Select(d => d.Id)
+              .ToArray();
         }
 
         private bool ProcessDeliveryToLocker(DeliveryRecord delivery, ParcelLocker locker)
@@ -374,21 +373,18 @@ namespace ParcelService
             return false;
         }
 
-
         public int ClientReceive(int deliveryId, string securityCode)
         {
             var delivery = ValidateClientReceiveInputs(deliveryId, securityCode);
             var shelfId = delivery.LocationShelfId ??
-                throw new InvalidOperationException("Shelf ID not assigned");
+              throw new InvalidOperationException("Shelf ID not assigned");
 
-            // Update delivery status and free the space on the shelf
             delivery.Status = DeliveryStatus.Delivered;
             delivery.CollectedAt = DateTimeOffset.Now;
             RemoveParcelFromShelf(shelfId, delivery.Id, delivery.Parcel);
 
             return shelfId;
         }
-
 
         private DeliveryRecord ValidateClientReceiveInputs(int deliveryId, string securityCode)
         {
@@ -415,28 +411,30 @@ namespace ParcelService
         public (int Year, int Month, decimal Income) GetMonthlyIncomeReport()
         {
             var monthlyIncome = _deliveries
-                .GroupBy(delivery => new { delivery.CreatedAt.Year, delivery.CreatedAt.Month })
-                .Select(month => new
-                {
-                    month.Key.Year,
-                    month.Key.Month,
-                    Income = month.Sum(delivery => delivery.Price)
-                })
-                .ToList();
+              .GroupBy(delivery => new {
+                  delivery.CreatedAt.Year,
+                  delivery.CreatedAt.Month
+              })
+              .Select(month => new {
+                  month.Key.Year,
+                  month.Key.Month,
+                  Income = month.Sum(delivery => delivery.Price)
+              })
+              .ToList();
             return monthlyIncome
-                .Select(date => (date.Year, date.Month, date.Income))
-                .FirstOrDefault();
+              .Select(date => (date.Year, date.Month, date.Income))
+              .FirstOrDefault();
         }
 
         private List<DeliveryRecord> GetCompletedDeliveriesInPeriod(
-            DateTimeOffset periodStart, DateTimeOffset periodEnd)
+          DateTimeOffset periodStart, DateTimeOffset periodEnd)
         {
             return _deliveries
-                .Where(d => d.Status == DeliveryStatus.Delivered)
-                .Where(d => d.CreatedAt >= periodStart &&
-                            d.CollectedAt <= periodEnd &&
-                            d.CollectedAt.HasValue)
-                .ToList();
+              .Where(d => d.Status == DeliveryStatus.Delivered)
+              .Where(d => d.CreatedAt >= periodStart &&
+                d.CollectedAt <= periodEnd &&
+                d.CollectedAt.HasValue)
+              .ToList();
         }
 
         public TimeSpan GetAverageDeliveryTime(DateTimeOffset periodStart, DateTimeOffset periodEnd)
@@ -449,7 +447,7 @@ namespace ParcelService
             }
 
             var avgSeconds = completedDeliveries
-                .Average(d => (d.CollectedAt!.Value - d.CreatedAt).TotalSeconds);
+              .Average(d => (d.CollectedAt!.Value - d.CreatedAt).TotalSeconds);
 
             return TimeSpan.FromSeconds(avgSeconds);
         }
